@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Priority Scoring — Connector</title>
+  <script src="https://p.trellocdn.com/power-up.min.js"></script>
+</head>
+<body>
+<script>
+var KEY_MGMT   = 'priority-scores';
+var KEY_DELTAS = 'cm-deltas';
+var KEY_MARKET = 'market-research';
+
+function avgDelta(deltas, field) {
+  if (!deltas || !deltas.length) return 0;
+  var sum = deltas.reduce(function(acc, d) { return acc + (d[field] || 0); }, 0);
+  return Math.round((sum / deltas.length) * 10) / 10;
+}
+
+TrelloPowerUp.initialize({
+
+  'card-back-section': function(t) {
+    return {
+      title: 'Priority Scoring',
+      icon: 'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/svg/1f3af.svg',
+      content: { type: 'iframe', url: t.signUrl('./section.html'), height: 340 }
+    };
+  },
+
+  'card-badges': function(t) {
+    return Promise.all([
+      t.get('card','shared',KEY_MGMT),
+      t.get('card','shared',KEY_DELTAS),
+      t.get('card','shared',KEY_MARKET)
+    ]).then(function(r) {
+      var mgmt = r[0] ? JSON.parse(r[0]) : null;
+      if (!mgmt) return [];
+      var deltas = r[1] ? JSON.parse(r[1]) : [];
+      var market = r[2];
+      var adjEx = Math.min(10, Math.max(1, mgmt.ex + avgDelta(deltas,'ex')));
+      var adjNw = Math.min(10, Math.max(1, mgmt.nw + avgDelta(deltas,'nw')));
+      var score = Math.round((mgmt.imp*0.4 + adjEx*0.3 + adjNw*0.3)*10);
+      var color = score>=70?'green':score>=45?'yellow':'red';
+      var type  = mgmt.type==='must'?'Must':mgmt.type==='should'?'Should':'Nice';
+      var out   = [{text:'Score '+score,color:color},{text:type}];
+      if (market) out.push({text:'Research',color:'sky'});
+      return out;
+    });
+  },
+
+  'card-detail-badges': function(t) {
+    return Promise.all([
+      t.get('card','shared',KEY_MGMT),
+      t.get('card','shared',KEY_DELTAS),
+      t.get('card','shared',KEY_MARKET)
+    ]).then(function(r) {
+      var mgmt = r[0] ? JSON.parse(r[0]) : null;
+      if (!mgmt) return [];
+      var deltas = r[1] ? JSON.parse(r[1]) : [];
+      var market = r[2];
+      var adjEx = Math.min(10, Math.max(1, mgmt.ex + avgDelta(deltas,'ex')));
+      var adjNw = Math.min(10, Math.max(1, mgmt.nw + avgDelta(deltas,'nw')));
+      var score = Math.round((mgmt.imp*0.4 + adjEx*0.3 + adjNw*0.3)*10);
+      var color = score>=70?'green':score>=45?'yellow':'red';
+      var cmNote = deltas.length ? ' ('+deltas.length+' CM)' : '';
+      var out = [
+        {title:'Score finale',      text:score+' / 100', color:color},
+        {title:'Tipo',              text:mgmt.type==='must'?'Must have':mgmt.type==='should'?'Should have':'Nice to have'},
+        {title:'Importanza (mgmt)', text:mgmt.imp+' / 10'},
+        {title:'Clienti esistenti', text:adjEx.toFixed(1)+' / 10'+cmNote},
+        {title:'Clienti nuovi',     text:adjNw.toFixed(1)+' / 10'+cmNote}
+      ];
+      if (market) out.push({title:'Ricerca di mercato',text:'Richiesta',color:'sky'});
+      return out;
+    });
+  }
+
+}, { appKey: 'YOUR_TRELLO_APP_KEY', appName: 'Priority Scoring' });
+</script>
+</body>
+</html>

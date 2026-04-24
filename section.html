@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Priority Scoring</title>
+<script src="https://p.trellocdn.com/power-up.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',-apple-system,sans-serif;background:#fff;color:#172b4d;font-size:13px;padding:12px 14px 10px}
+
+/* ── TABS ── */
+.tabs{display:flex;gap:2px;margin-bottom:14px;background:#f4f5f7;border-radius:6px;padding:3px}
+.tab{flex:1;padding:5px;border:none;border-radius:4px;background:transparent;font-size:11px;font-weight:500;color:#5e6c84;cursor:pointer;font-family:inherit;transition:all .15s}
+.tab.active{background:#fff;color:#172b4d;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+
+/* ── PANELS ── */
+.panel{display:none}
+.panel.active{display:block}
+
+/* ── TYPE ROW ── */
+.type-row{display:flex;gap:5px;margin-bottom:12px}
+.type-btn{flex:1;padding:5px 0;border:1.5px solid #dfe1e6;border-radius:4px;background:#f4f5f7;font-size:11px;font-weight:500;cursor:pointer;color:#5e6c84;transition:all .15s;font-family:inherit}
+.type-btn.active-must  {background:#ffebe6;border-color:#ff7452;color:#de350b}
+.type-btn.active-should{background:#fffae6;border-color:#ffab00;color:#974f0c}
+.type-btn.active-nice  {background:#e3fcef;border-color:#57d9a3;color:#006644}
+
+/* ── SLIDERS ── */
+.sliders{display:flex;flex-direction:column;gap:9px;margin-bottom:12px}
+.slider-row{display:flex;align-items:center;gap:8px}
+.slider-row label{font-size:11px;color:#5e6c84;min-width:112px;font-weight:500}
+.slider-row input[type=range]{flex:1;-webkit-appearance:none;height:4px;border-radius:2px;background:#dfe1e6;outline:none;cursor:pointer}
+.slider-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:#0052cc;cursor:pointer}
+.slider-val{font-size:12px;font-weight:500;min-width:18px;text-align:right;color:#172b4d}
+
+/* ── DELTA SLIDERS ── */
+.delta-note{font-size:11px;color:#5e6c84;background:#f4f5f7;border-radius:4px;padding:6px 8px;margin-bottom:10px;line-height:1.5}
+.delta-note strong{color:#172b4d}
+.delta-row{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.delta-row label{font-size:11px;color:#5e6c84;min-width:112px;font-weight:500}
+.delta-row input[type=range]{flex:1;-webkit-appearance:none;height:4px;border-radius:2px;background:#dfe1e6;outline:none;cursor:pointer}
+.delta-row input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:14px;height:14px;border-radius:50%;background:#6554c0;cursor:pointer}
+.delta-val{font-size:12px;font-weight:500;min-width:28px;text-align:right}
+.delta-pos{color:#36b37e}
+.delta-neg{color:#ff5630}
+.delta-zero{color:#5e6c84}
+
+.cm-name-row{margin-bottom:10px}
+.cm-name-row label{font-size:11px;color:#5e6c84;font-weight:500;display:block;margin-bottom:3px}
+.cm-name-row input{width:100%;padding:5px 8px;border:1.5px solid #dfe1e6;border-radius:4px;font-size:12px;font-family:inherit;outline:none;color:#172b4d}
+.cm-name-row input:focus{border-color:#0052cc}
+
+.cm-votes{margin-bottom:10px}
+.cm-vote-title{font-size:11px;font-weight:500;color:#5e6c84;margin-bottom:5px}
+.cm-vote-item{display:flex;justify-content:space-between;align-items:center;padding:4px 6px;background:#f4f5f7;border-radius:3px;margin-bottom:3px;font-size:11px}
+.cm-vote-name{color:#172b4d;font-weight:500}
+.cm-vote-vals{color:#5e6c84;display:flex;gap:8px}
+.cm-vote-del{background:none;border:none;color:#97a0af;cursor:pointer;font-size:13px;padding:0 2px;line-height:1}
+.cm-vote-del:hover{color:#ff5630}
+
+/* ── MARKET FLAG ── */
+.market-row{display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border:1.5px solid #dfe1e6;border-radius:5px;margin-bottom:12px;cursor:pointer;transition:border-color .15s}
+.market-row.on{border-color:#0065ff;background:#deebff}
+.market-label{font-size:12px;font-weight:500;color:#172b4d;display:flex;align-items:center;gap:6px}
+.market-label .icon{font-size:14px}
+.market-sub{font-size:11px;color:#5e6c84;margin-top:1px}
+.toggle{width:32px;height:18px;border-radius:9px;background:#dfe1e6;position:relative;transition:background .2s;flex-shrink:0}
+.toggle.on{background:#0052cc}
+.toggle::after{content:'';position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;top:2px;left:2px;transition:transform .2s;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+.toggle.on::after{transform:translateX(14px)}
+
+/* ── SCORE BAR ── */
+.score-bar{display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:4px;background:#f4f5f7;border:1px solid #dfe1e6;margin-bottom:10px}
+.score-num{font-size:20px;font-weight:500;min-width:36px;color:#172b4d}
+.score-track{flex:1;height:5px;border-radius:3px;background:#dfe1e6;overflow:hidden}
+.score-fill{height:100%;border-radius:3px;transition:width .3s,background .3s}
+.score-label{font-size:11px;min-width:62px;text-align:right;font-weight:500}
+
+/* ── BUTTONS ── */
+.save-btn{width:100%;padding:7px;background:#0052cc;color:#fff;border:none;border-radius:4px;font-size:13px;font-weight:500;cursor:pointer;font-family:inherit;transition:background .15s}
+.save-btn:hover{background:#0065ff}
+.save-btn.cm{background:#6554c0}
+.save-btn.cm:hover{background:#8777d9}
+.saved-msg{text-align:center;font-size:11px;color:#00875a;margin-top:4px;height:14px}
+</style>
+</head>
+<body>
+
+<div class="tabs">
+  <button class="tab active" id="tab-mgmt" onclick="switchTab('mgmt')">Management</button>
+  <button class="tab"        id="tab-cm"   onclick="switchTab('cm')">Country Managers</button>
+  <button class="tab"        id="tab-flag" onclick="switchTab('flag')">Flags</button>
+</div>
+
+<!-- ══ MANAGEMENT PANEL ══ -->
+<div class="panel active" id="panel-mgmt">
+  <div class="type-row">
+    <button class="type-btn active-must" id="btn-must"   onclick="setType('must')">Must have</button>
+    <button class="type-btn"             id="btn-should" onclick="setType('should')">Should have</button>
+    <button class="type-btn"             id="btn-nice"   onclick="setType('nice')">Nice to have</button>
+  </div>
+  <div class="sliders">
+    <div class="slider-row">
+      <label>Importanza</label>
+      <input type="range" min="1" max="10" step="1" value="5" id="s-imp" oninput="updateScore()">
+      <span class="slider-val" id="v-imp">5</span>
+    </div>
+    <div class="slider-row">
+      <label>Clienti esistenti</label>
+      <input type="range" min="1" max="10" step="1" value="5" id="s-ex" oninput="updateScore()">
+      <span class="slider-val" id="v-ex">5</span>
+    </div>
+    <div class="slider-row">
+      <label>Clienti nuovi</label>
+      <input type="range" min="1" max="10" step="1" value="5" id="s-new" oninput="updateScore()">
+      <span class="slider-val" id="v-new">5</span>
+    </div>
+  </div>
+  <div class="score-bar">
+    <span class="score-num" id="score-num">50</span>
+    <div class="score-track"><div class="score-fill" id="score-fill" style="width:50%;background:#ffab00"></div></div>
+    <span class="score-label" id="score-label">Media</span>
+  </div>
+  <button class="save-btn" onclick="saveMgmt()">Salva punteggio</button>
+  <div class="saved-msg" id="msg-mgmt"></div>
+</div>
+
+<!-- ══ CM PANEL ══ -->
+<div class="panel" id="panel-cm">
+  <div class="delta-note">
+    Puoi alzare o abbassare il punteggio su <strong>clienti esistenti</strong> e <strong>clienti nuovi</strong> in base alla tua esperienza sul mercato. Il management vede la media di tutti i CM.
+  </div>
+  <div class="cm-name-row">
+    <label>Il tuo nome / mercato</label>
+    <input type="text" id="cm-name" placeholder="Es. Jan – Netherlands" />
+  </div>
+  <div class="delta-row">
+    <label>Clienti esistenti</label>
+    <input type="range" min="-3" max="3" step="1" value="0" id="d-ex" oninput="updateDeltaDisplay()">
+    <span class="delta-val delta-zero" id="vd-ex">0</span>
+  </div>
+  <div class="delta-row">
+    <label>Clienti nuovi</label>
+    <input type="range" min="-3" max="3" step="1" value="0" id="d-new" oninput="updateDeltaDisplay()">
+    <span class="delta-val delta-zero" id="vd-new">0</span>
+  </div>
+  <div class="cm-votes" id="cm-votes-wrap" style="display:none">
+    <div class="cm-vote-title">Voti ricevuti</div>
+    <div id="cm-votes-list"></div>
+  </div>
+  <button class="save-btn cm" onclick="saveCM()">Invia il mio voto</button>
+  <div class="saved-msg" id="msg-cm"></div>
+</div>
+
+<!-- ══ FLAGS PANEL ══ -->
+<div class="panel" id="panel-flag">
+  <div class="market-row" id="market-row" onclick="toggleMarket()">
+    <div>
+      <div class="market-label"><span class="icon">🔍</span> Richiede ricerca di mercato</div>
+      <div class="market-sub">Attiva questo flag per i task importanti che necessitano analisi esterna</div>
+    </div>
+    <div class="toggle" id="market-toggle"></div>
+  </div>
+  <button class="save-btn" onclick="saveFlag()">Salva flag</button>
+  <div class="saved-msg" id="msg-flag"></div>
+</div>
+
+<script>
+var t = TrelloPowerUp.iframe();
+var KEY_MGMT   = 'priority-scores';
+var KEY_DELTAS = 'cm-deltas';
+var KEY_MARKET = 'market-research';
+var currentType   = 'must';
+var marketOn      = false;
+var loadedDeltas  = [];
+
+/* ── TABS ── */
+function switchTab(name) {
+  ['mgmt','cm','flag'].forEach(function(n) {
+    document.getElementById('tab-'+n).classList.toggle('active', n===name);
+    document.getElementById('panel-'+n).classList.toggle('active', n===name);
+  });
+  setTimeout(function(){t.sizeTo(document.body).catch(function(){});},50);
+}
+
+/* ── TYPE ── */
+function setType(type) {
+  currentType = type;
+  ['must','should','nice'].forEach(function(k){
+    document.getElementById('btn-'+k).className = 'type-btn'+(k===type?' active-'+k:'');
+  });
+  updateScore();
+}
+
+/* ── SCORE ── */
+function updateScore() {
+  var imp = +document.getElementById('s-imp').value;
+  var ex  = +document.getElementById('s-ex').value;
+  var nw  = +document.getElementById('s-new').value;
+  document.getElementById('v-imp').textContent = imp;
+  document.getElementById('v-ex').textContent  = ex;
+  document.getElementById('v-new').textContent = nw;
+
+  var avgEx  = avgDelta(loadedDeltas,'ex');
+  var avgNw  = avgDelta(loadedDeltas,'nw');
+  var adjEx  = Math.min(10,Math.max(1, ex+avgEx));
+  var adjNw  = Math.min(10,Math.max(1, nw+avgNw));
+  var score  = Math.round((imp*0.4 + adjEx*0.3 + adjNw*0.3)*10);
+
+  document.getElementById('score-num').textContent = score;
+  var fill  = document.getElementById('score-fill');
+  var label = document.getElementById('score-label');
+  var color, txt;
+  if (score>=70){ color='#36b37e'; txt='Alta priorità'; }
+  else if (score>=45){ color='#ffab00'; txt='Media'; }
+  else { color='#ff5630'; txt='Bassa'; }
+  fill.style.width = score+'%';
+  fill.style.background = color;
+  label.textContent = txt;
+  label.style.color = color;
+}
+
+/* ── DELTA DISPLAY ── */
+function updateDeltaDisplay() {
+  ['ex','new'].forEach(function(k){
+    var v   = +document.getElementById('d-'+k).value;
+    var el  = document.getElementById('vd-'+k);
+    el.textContent = (v>0?'+':'')+v;
+    el.className = 'delta-val '+(v>0?'delta-pos':v<0?'delta-neg':'delta-zero');
+  });
+}
+
+/* ── MARKET TOGGLE ── */
+function toggleMarket() {
+  marketOn = !marketOn;
+  document.getElementById('market-toggle').classList.toggle('on', marketOn);
+  document.getElementById('market-row').classList.toggle('on', marketOn);
+}
+
+/* ── SAVE MGMT ── */
+function saveMgmt() {
+  var data = JSON.stringify({
+    type: currentType,
+    imp:  +document.getElementById('s-imp').value,
+    ex:   +document.getElementById('s-ex').value,
+    nw:   +document.getElementById('s-new').value
+  });
+  t.set('card','shared',KEY_MGMT,data).then(function(){
+    flash('msg-mgmt','✓ Salvato');
+    t.sizeTo(document.body).catch(function(){});
+  });
+}
+
+/* ── SAVE CM ── */
+function saveCM() {
+  var name = document.getElementById('cm-name').value.trim();
+  if (!name) { document.getElementById('cm-name').focus(); return; }
+  var exD = +document.getElementById('d-ex').value;
+  var nwD = +document.getElementById('d-new').value;
+
+  loadedDeltas = loadedDeltas.filter(function(d){ return d.name !== name; });
+  loadedDeltas.push({ name: name, ex: exD, nw: nwD });
+
+  t.set('card','shared',KEY_DELTAS, JSON.stringify(loadedDeltas)).then(function(){
+    flash('msg-cm','✓ Voto inviato');
+    renderCMVotes();
+    updateScore();
+    document.getElementById('d-ex').value = 0;
+    document.getElementById('d-new').value = 0;
+    updateDeltaDisplay();
+    t.sizeTo(document.body).catch(function(){});
+  });
+}
+
+/* ── SAVE FLAG ── */
+function saveFlag() {
+  t.set('card','shared',KEY_MARKET, marketOn ? '1' : '').then(function(){
+    flash('msg-flag','✓ Salvato');
+  });
+}
+
+/* ── RENDER CM VOTES ── */
+function renderCMVotes() {
+  var wrap = document.getElementById('cm-votes-wrap');
+  var list = document.getElementById('cm-votes-list');
+  if (!loadedDeltas.length) { wrap.style.display='none'; return; }
+  wrap.style.display = 'block';
+  list.innerHTML = loadedDeltas.map(function(d){
+    return '<div class="cm-vote-item">'
+      +'<span class="cm-vote-name">'+d.name+'</span>'
+      +'<span class="cm-vote-vals">'
+      +'<span>Exist: '+(d.ex>0?'+':'')+d.ex+'</span>'
+      +'<span>Nuovi: '+(d.nw>0?'+':'')+d.nw+'</span>'
+      +'</span>'
+      +'<button class="cm-vote-del" onclick="removeCM(\''+d.name+'\')">×</button>'
+      +'</div>';
+  }).join('');
+}
+
+function removeCM(name) {
+  loadedDeltas = loadedDeltas.filter(function(d){ return d.name !== name; });
+  t.set('card','shared',KEY_DELTAS, JSON.stringify(loadedDeltas)).then(function(){
+    renderCMVotes();
+    updateScore();
+  });
+}
+
+/* ── UTILS ── */
+function avgDelta(deltas, field) {
+  if (!deltas||!deltas.length) return 0;
+  return deltas.reduce(function(a,d){return a+(d[field]||0);},0)/deltas.length;
+}
+function flash(id, msg) {
+  var el = document.getElementById(id);
+  el.textContent = msg; el.style.opacity='1';
+  setTimeout(function(){ el.style.opacity='0'; }, 2200);
+}
+
+/* ── INIT: load existing data ── */
+Promise.all([
+  t.get('card','shared',KEY_MGMT),
+  t.get('card','shared',KEY_DELTAS),
+  t.get('card','shared',KEY_MARKET)
+]).then(function(r) {
+  if (r[0]) {
+    var d = JSON.parse(r[0]);
+    if (d.type) setType(d.type);
+    if (d.imp)  document.getElementById('s-imp').value = d.imp;
+    if (d.ex)   document.getElementById('s-ex').value  = d.ex;
+    if (d.nw)   document.getElementById('s-new').value = d.nw;
+  }
+  loadedDeltas = r[1] ? JSON.parse(r[1]) : [];
+  renderCMVotes();
+  if (r[2]) {
+    marketOn = true;
+    document.getElementById('market-toggle').classList.add('on');
+    document.getElementById('market-row').classList.add('on');
+  }
+  updateScore();
+  updateDeltaDisplay();
+  t.sizeTo(document.body).catch(function(){});
+}).catch(function(){});
+</script>
+</body>
+</html>
